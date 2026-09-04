@@ -34,9 +34,32 @@ function getTodayDateStr(): string {
   return `${now.getFullYear()}_${now.getMonth()}_${now.getDate()}`;
 }
 
+const TOOL_IDS = ["excuse", "cooked", "apology", "decision"];
+
 interface StoredLimit {
   c: number;
   s: string;
+}
+
+interface ChatStateBackup extends ChatState {
+  _mc?: number;
+  _md?: string;
+}
+
+function getBackupCount(): number {
+  let maxCount = 0;
+  const todayStr = getTodayDateStr();
+  for (const tid of TOOL_IDS) {
+    try {
+      const raw = localStorage.getItem(getKey(tid));
+      if (!raw) continue;
+      const parsed: ChatStateBackup = JSON.parse(raw);
+      if (parsed._mc && parsed._md === todayStr) {
+        maxCount = Math.max(maxCount, parsed._mc);
+      }
+    } catch { /* skip */ }
+  }
+  return maxCount;
 }
 
 export function loadChat(toolId: string): ChatState {
@@ -44,15 +67,21 @@ export function loadChat(toolId: string): ChatState {
   try {
     const raw = localStorage.getItem(getKey(toolId));
     if (!raw) return { messages: [] };
-    return JSON.parse(raw) as ChatState;
+    const parsed = JSON.parse(raw) as ChatState;
+    return { messages: parsed.messages || [] };
   } catch {
     return { messages: [] };
   }
 }
 
-export function saveChat(toolId: string, state: ChatState): void {
+export function saveChat(toolId: string, state: ChatState, totalUserMsgsToday?: number): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(getKey(toolId), JSON.stringify(state));
+  const backup: ChatStateBackup = {
+    ...state,
+    _mc: totalUserMsgsToday,
+    _md: getTodayDateStr(),
+  };
+  localStorage.setItem(getKey(toolId), JSON.stringify(backup));
 }
 
 export function clearChat(toolId: string): void {
@@ -72,16 +101,19 @@ export function setLanguage(lang: Language): void {
 
 export function getDailyMessageCount(): number {
   if (typeof window === "undefined") return 0;
+
+  const backupCount = getBackupCount();
+
   try {
     const raw = localStorage.getItem(getTodayKey());
-    if (!raw) return 0;
+    if (!raw) return backupCount;
     const stored: StoredLimit = JSON.parse(raw);
     const dateStr = getTodayDateStr();
     const expectedChecksum = getChecksum(stored.c, dateStr);
-    if (stored.s !== expectedChecksum) return DAILY_LIMIT;
-    return stored.c;
+    if (stored.s !== expectedChecksum) return Math.max(stored.c, backupCount);
+    return Math.max(stored.c, backupCount);
   } catch {
-    return 0;
+    return backupCount;
   }
 }
 

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Message, ToolId, Language } from "@/lib/types";
 import { tools } from "@/lib/tools";
-import { createMessage, saveChat, loadChat, clearChat, canSendMessage, incrementDailyMessageCount, getRemainingMessages } from "@/lib/storage";
+import { createMessage, saveChat, loadChat, clearChat, canSendMessage, incrementDailyMessageCount, getRemainingMessages, getDailyMessageCount } from "@/lib/storage";
 import TypingIndicator from "./TypingIndicator";
 import CookedScore from "./CookedScore";
 
@@ -154,7 +154,7 @@ export default function ChatUI({ toolId, language, onNewChat }: ChatUIProps) {
       setRemainingMessages(DAILY_LIMIT - newRemaining);
 
       const chatState = { messages: newMessages };
-      saveChat(toolId, chatState);
+      saveChat(toolId, chatState, getDailyMessageCount());
 
       try {
         abortControllerRef.current = new AbortController();
@@ -193,7 +193,7 @@ export default function ChatUI({ toolId, language, onNewChat }: ChatUIProps) {
         const finalMessages = [...newMessages, assistantMsg];
         setMessages(finalMessages);
         setStreamingText("");
-        saveChat(toolId, { messages: finalMessages });
+        saveChat(toolId, { messages: finalMessages }, getDailyMessageCount());
 
         if (fullText.includes(CHAT_ENDED)) {
           setChatEnded(true);
@@ -213,7 +213,7 @@ export default function ChatUI({ toolId, language, onNewChat }: ChatUIProps) {
         );
         const errorMessages = [...newMessages, errorMsg];
         setMessages(errorMessages);
-        saveChat(toolId, { messages: errorMessages });
+        saveChat(toolId, { messages: errorMessages }, getDailyMessageCount());
       } finally {
         setIsLoading(false);
         setStreamingText("");
