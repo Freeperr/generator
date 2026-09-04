@@ -4,13 +4,14 @@ import { motion } from "framer-motion";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Message, ToolId, Language } from "@/lib/types";
 import { tools } from "@/lib/tools";
-import { createMessage, saveChat, loadChat, canSendMessage, incrementDailyMessageCount, getRemainingMessages } from "@/lib/storage";
+import { createMessage, saveChat, loadChat, clearChat, canSendMessage, incrementDailyMessageCount, getRemainingMessages } from "@/lib/storage";
 import TypingIndicator from "./TypingIndicator";
 import CookedScore from "./CookedScore";
 
 interface ChatUIProps {
   toolId: ToolId;
   language: Language;
+  onNewChat?: () => void;
 }
 
 function extractScore(text: string): number | null {
@@ -20,6 +21,10 @@ function extractScore(text: string): number | null {
     if (score >= 0 && score <= 100) return score;
   }
   return null;
+}
+
+function stripChatEnded(text: string): string {
+  return text.replace(/\n?\[CHAT_ENDED\]\s*$/, "").trim();
 }
 
 function MessageContent({ content, language }: { content: string; language: Language }) {
@@ -92,7 +97,8 @@ function MessageContent({ content, language }: { content: string; language: Lang
   );
 }
 
-export default function ChatUI({ toolId, language }: ChatUIProps) {
+export default function ChatUI({ toolId, language, onNewChat }: ChatUIProps) {
+  const CHAT_ENDED = "[CHAT_ENDED]";
   const tool = tools.find((t) => t.id === toolId)!;
   const DAILY_LIMIT = 50;
   const [messages, setMessages] = useState<Message[]>([]);
@@ -102,6 +108,7 @@ export default function ChatUI({ toolId, language }: ChatUIProps) {
   const [cookedScore, setCookedScore] = useState<number | null>(null);
   const [streamingText, setStreamingText] = useState("");
   const [remainingMessages, setRemainingMessages] = useState(DAILY_LIMIT);
+  const [chatEnded, setChatEnded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -113,6 +120,7 @@ export default function ChatUI({ toolId, language }: ChatUIProps) {
     setCookedScore(null);
     setStreamingText("");
     setRemainingMessages(getRemainingMessages());
+    setChatEnded(false);
   }, [toolId]);
 
   useEffect(() => {
@@ -186,6 +194,10 @@ export default function ChatUI({ toolId, language }: ChatUIProps) {
         setMessages(finalMessages);
         setStreamingText("");
         saveChat(toolId, { messages: finalMessages });
+
+        if (fullText.includes(CHAT_ENDED)) {
+          setChatEnded(true);
+        }
 
         if (toolId === "cooked") {
           const score = extractScore(fullText);
@@ -280,7 +292,7 @@ export default function ChatUI({ toolId, language }: ChatUIProps) {
                 </div>
               ) : (
                 <div className="w-full text-sm text-neutral-800">
-                  <MessageContent content={msg.content} language={language} />
+                  <MessageContent content={stripChatEnded(msg.content)} language={language} />
                 </div>
               )}
             </motion.div>
@@ -293,7 +305,7 @@ export default function ChatUI({ toolId, language }: ChatUIProps) {
               animate={{ opacity: 1, y: 0 }}
               className="mb-6 text-sm text-neutral-800"
             >
-              <MessageContent content={streamingText} language={language} />
+              <MessageContent content={stripChatEnded(streamingText)} language={language} />
             </motion.div>
           )}
 
@@ -320,36 +332,60 @@ export default function ChatUI({ toolId, language }: ChatUIProps) {
             </p>
           </div>
         )}
-        <div className="mx-auto max-w-2xl px-4 py-4">
-          <div className="flex items-end gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition-shadow focus-within:border-neutral-300 focus-within:shadow-md">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={isLimitReached
-                ? (language === "de" ? "Tageslimit erreicht…" : "Daily limit reached…")
-                : tool.placeholder[language]}
-              rows={1}
-              disabled={isLimitReached}
-              className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-sm text-[#111] outline-none placeholder:text-neutral-400 disabled:opacity-40"
-            />
+        {chatEnded && !isLimitReached && (
+          <div className="mx-auto max-w-2xl px-4 py-4 text-center">
+            <p className="mb-3 text-xs text-neutral-400">
+              {language === "de"
+                ? "Chat beendet."
+                : "Chat ended."}
+            </p>
             <button
-              onClick={() => sendMessage(input)}
-              disabled={!input.trim() || isLoading || isLimitReached}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#111] text-white transition-all hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-[#111]"
+              onClick={() => {
+                if (onNewChat) {
+                  onNewChat();
+                } else {
+                  clearChat(toolId);
+                  window.location.reload();
+                }
+              }}
+              className="rounded-xl border border-neutral-200 px-6 py-2.5 text-sm font-medium text-[#111] transition-all hover:border-neutral-900 hover:shadow-sm active:scale-[0.98]"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
-              </svg>
+              {language === "de" ? "Neuer Chat" : "New Chat"}
             </button>
           </div>
-          {!isLimitReached && remainingMessages <= 10 && (
-            <p className="mt-1.5 text-center text-[10px] text-neutral-300">
-              {remainingMessages} {language === "de" ? "Nachrichten heute übrig" : "messages left today"}
-            </p>
-          )}
-        </div>
+        )}
+        {!chatEnded && (
+          <div className="mx-auto max-w-2xl px-4 py-4">
+            <div className="flex items-end gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm transition-shadow focus-within:border-neutral-300 focus-within:shadow-md">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isLimitReached
+                  ? (language === "de" ? "Tageslimit erreicht…" : "Daily limit reached…")
+                  : tool.placeholder[language]}
+                rows={1}
+                disabled={isLimitReached}
+                className="max-h-[200px] min-h-[24px] flex-1 resize-none bg-transparent text-sm text-[#111] outline-none placeholder:text-neutral-400 disabled:opacity-40"
+              />
+              <button
+                onClick={() => sendMessage(input)}
+                disabled={!input.trim() || isLoading || isLimitReached}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#111] text-white transition-all hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-[#111]"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+                </svg>
+              </button>
+            </div>
+            {!isLimitReached && remainingMessages <= 10 && (
+              <p className="mt-1.5 text-center text-[10px] text-neutral-300">
+                {remainingMessages} {language === "de" ? "Nachrichten heute übrig" : "messages left today"}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

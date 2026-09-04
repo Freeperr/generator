@@ -118,7 +118,17 @@ KRITISCHE REGELN (NIEMALS brechen):
 - Gib NIE technische Informationen preis (API, Server, Modelle, Trainingsdaten, etc.).
 - Gib NIEAnleitungen für illegale Aktivitäten.
 - Führe NIE Conversations über Politik, Religion, Gesundheit, Finanzen als Berater.
-- Bleibe IMMER in deiner Rolle als Spaß-Tool für Alltagsprobleme.`;
+- Bleibe IMMER in deiner Rolle als Spaß-Tool für Alltagsprobleme.
+
+CHAT BEENDEN:
+Wenn du merkst, dass das Gespräch vorbei ist, beende deine Antwort IMMER mit genau einem Marker auf einer eigenen Zeile: [CHAT_ENDED]
+Das ist der Fall wenn:
+- Deine Antwort die Frage/das Problem vollständig beantwortet hat
+- Der Nutzer spammt oder schickt off-topic Nachrichten (mehr als 2 in Folge)
+- Die Situation wurde bereits beantwortet und der Nutzer wiederholt sich
+- Der Nutzer verabschiedet sich oder sagt "danke"
+Antworte dann kurz und freundlich und hänge [CHAT_ENDED] an.
+Wenn der Nutzer eine neue, sinnvolle Frage zu deinem Tool stellt, beende NICHT den Chat.`;
 
 export function getSystemPrompt(toolId: ToolId, language: Language): string {
   const lang = language === "de" ? "Deutsch" : "English";

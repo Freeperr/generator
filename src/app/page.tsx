@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Language, ToolId } from "@/lib/types";
-import { getLanguage, setLanguage, clearChat } from "@/lib/storage";
+import { getLanguage, setLanguage, clearChat, resetDailyLimit } from "@/lib/storage";
 import { tools } from "@/lib/tools";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import Sidebar from "@/components/Sidebar";
@@ -26,12 +26,24 @@ export default function Home() {
       setLang(saved);
     }
     setIsReady(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).resetLimit = () => {
+      resetDailyLimit();
+      console.log("Limit reset. Reload the page.");
+    };
   }, []);
 
   const handleLanguageSelect = useCallback((lang: Language) => {
     setLang(lang);
     setLanguage(lang);
   }, []);
+
+  const handleSelectTool = useCallback((newTool: ToolId) => {
+    if (newTool !== activeTool) {
+      clearChat(activeTool);
+    }
+    setActiveTool(newTool);
+  }, [activeTool]);
 
   const handleNewChat = useCallback(() => {
     clearChat(activeTool);
@@ -56,7 +68,7 @@ export default function Home() {
       <Sidebar
         activeTool={activeTool}
         language={language}
-        onSelectTool={setActiveTool}
+        onSelectTool={handleSelectTool}
         onOpenSettings={() => setShowSettings(true)}
         isMobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
@@ -100,7 +112,7 @@ export default function Home() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              <ChatUI toolId={activeTool} language={language} />
+              <ChatUI toolId={activeTool} language={language} onNewChat={handleNewChat} />
             </motion.div>
           </AnimatePresence>
         </main>

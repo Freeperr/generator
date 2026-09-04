@@ -33,9 +33,6 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
   const model = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
-  console.log("API KEY length:", apiKey?.length, "starts with:", apiKey?.substring(0, 10));
-  console.log("MODEL:", model);
-
   if (!apiKey) {
     return new Response("Server configuration error", { status: 500 });
   }
