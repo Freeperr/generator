@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { getSystemPrompt } from "@/lib/tools";
 import { Language, ToolId } from "@/lib/types";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 interface ChatRequest {
   tool: ToolId;
@@ -31,7 +31,10 @@ function isPromptInjection(text: string): boolean {
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GROQ_API_KEY;
-  const model = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  const model = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
+
+  console.log("API KEY length:", apiKey?.length, "starts with:", apiKey?.substring(0, 10));
+  console.log("MODEL:", model);
 
   if (!apiKey) {
     return new Response("Server configuration error", { status: 500 });
@@ -93,7 +96,8 @@ export async function POST(req: NextRequest) {
     });
 
     if (!response.ok) {
-      console.error("Groq API error:", response.status);
+      const errBody = await response.text().catch(() => "");
+      console.error("Groq API error:", response.status, errBody);
       return new Response("AI service temporarily unavailable", { status: 502 });
     }
 
